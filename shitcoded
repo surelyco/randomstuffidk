@@ -1,0 +1,386 @@
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local function attemptBypass()
+    print("[BYPASS] Starting JobId bypass attempts...")
+    
+    local function scanGameMemory()
+        print("[BYPASS] Attempting memory scan method...")
+        local success, result = pcall(function()
+            local objects = {}
+            
+            for _, obj in ipairs(game:GetChildren()) do
+                if obj.Name and string.find(tostring(obj), "%x%x%x%x%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%x%x%x%x%x%x%x%x") then
+                    table.insert(objects, tostring(obj))
+                end
+            end
+            
+            local dm = game
+            for prop, val in pairs(getmetatable(dm)) do
+                if type(val) == "string" and string.match(val, "%x%x%x%x%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%x%x%x%x%x%x%x%x") then
+                    return val
+                end
+            end
+            
+            return nil
+        end)
+        
+        if success and result then
+            print("[BYPASS] Memory scan found potential JobId:", result)
+            return result
+        end
+        return nil
+    end
+    
+    local function inspectLuaState()
+        print("[BYPASS] Attempting Lua state inspection...")
+        local success, result = pcall(function()
+            local dm = game
+            local hidden = {}
+            
+            local original = rawget(dm, "JobId")
+            if original and original ~= game.JobId then
+                return original
+            end
+            
+            local alternatives = {"_JobId", "__JobId", "OriginalJobId", "_originalJobId", "RealJobId"}
+            for _, alt in ipairs(alternatives) do
+                local val = rawget(dm, alt)
+                if val and type(val) == "string" and string.match(val, "%x+%-%x+%-%x+%-%x+%-%x+") then
+                    return val
+                end
+            end
+            
+            return nil
+        end)
+        
+        if success and result then
+            print("[BYPASS] Lua state inspection found:", result)
+            return result
+        end
+        return nil
+    end
+    
+    local function networkBypass()
+        print("[BYPASS] Attempting network bypass...")
+        local success, result = pcall(function()
+            local originalRequest = request
+            local capturedJobId = nil
+            
+            local function hookRequest(options)
+                if options.Url and string.find(options.Url, "jobId=") then
+                    local jobMatch = string.match(options.Url, "jobId=([%w%-]+)")
+                    if jobMatch and jobMatch ~= game.JobId then
+                        capturedJobId = jobMatch
+                    end
+                end
+                
+                if options.Headers then
+                    for k, v in pairs(options.Headers) do
+                        if string.find(k:lower(), "jobid") or string.find(k:lower(), "job%-id") then
+                            if v ~= game.JobId then
+                                capturedJobId = v
+                            end
+                        end
+                    end
+                end
+                
+                return originalRequest(options)
+            end
+            
+            request = hookRequest
+            
+            pcall(function()
+                request({
+                    Url = "https://httpbin.org/get",
+                    Method = "GET"
+                })
+            end)
+            
+            request = originalRequest
+            
+            return capturedJobId
+        end)
+        
+        if success and result then
+            print("[BYPASS] Network bypass found:", result)
+            return result
+        end
+        return nil
+    end
+    
+    local function extractFromDebugInfo()
+        print("[BYPASS] Attempting debug info extraction...")
+        local success, result = pcall(function()
+            local info = debug.getinfo(2)
+            if info and info.source then
+                local jobMatch = string.match(info.source, "%x%x%x%x%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%x%x%x%x%x%x%x%x")
+                if jobMatch and jobMatch ~= game.JobId then
+                    return jobMatch
+                end
+            end
+            
+            local registry = debug.getregistry()
+            for k, v in pairs(registry) do
+                if type(v) == "string" and string.match(v, "%x%x%x%x%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%x%x%x%x%x%x%x%x") then
+                    if v ~= game.JobId then
+                        return v
+                    end
+                end
+            end
+            
+            return nil
+        end)
+        
+        if success and result then
+            print("[BYPASS] Debug extraction found:", result)
+            return result
+        end
+        return nil
+    end
+    
+    local function metatableBypass()
+        print("[BYPASS] Attempting metatable bypass...")
+        local success, result = pcall(function()
+            local originalMT = getmetatable(game)
+            
+            local bypassMT = {}
+            
+            for k, v in pairs(originalMT) do
+                bypassMT[k] = v
+            end
+            
+            local originalIndex = originalMT.__index
+            bypassMT.__index = function(self, key)
+                if key == "JobId" then
+                    local raw = rawget(self, key)
+                    if raw then
+                        return raw
+                    end
+                    
+                    local realJobId = nil
+                    
+                    if originalIndex then
+                        local orig = originalIndex(self, "_" .. key)
+                        if orig and orig ~= game.JobId then
+                            realJobId = orig
+                        end
+                    end
+                    
+                    return realJobId or originalIndex(self, key)
+                end
+                
+                return originalIndex(self, key)
+            end
+            
+            setmetatable(game, bypassMT)
+            local bypassedJobId = game.JobId
+            
+            setmetatable(game, originalMT)
+            
+            return bypassedJobId ~= game.JobId and bypassedJobId or nil
+        end)
+        
+        if success and result then
+            print("[BYPASS] Metatable bypass found:", result)
+            return result
+        end
+        return nil
+    end
+    
+    local function propertyEnumeration()
+        print("[BYPASS] Attempting property enumeration...")
+        local success, result = pcall(function()
+            local props = {}
+            
+            local methods = {
+                function() return debug.getregistry() end,
+                function() return getfenv(0) end,
+                function() return getfenv(1) end,
+                function() return getfenv(game.JobId) end
+            }
+            
+            for _, method in ipairs(methods) do
+                local env = method()
+                if env then
+                    for k, v in pairs(env) do
+                        if type(v) == "string" and string.match(v, "%x%x%x%x%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%x%x%x%x%x%x%x%x") then
+                            if v ~= game.JobId then
+                                props[#props + 1] = v
+                            end
+                        end
+                    end
+                end
+            end
+            
+            for _, prop in ipairs(props) do
+                if prop ~= game.JobId then
+                    return prop
+                end
+            end
+            
+            return nil
+        end)
+        
+        if success and result then
+            print("[BYPASS] Property enumeration found:", result)
+            return result
+        end
+        return nil
+    end
+    
+    local function lowLevelAccess()
+        print("[BYPASS] Attempting low-level access...")
+        local success, result = pcall(function()
+            if rawget(_G, "debug") and rawget(debug, "getmetatable") then
+                local gameMT = debug.getmetatable(game)
+                if gameMT then
+                    for k, v in pairs(gameMT) do
+                        if type(v) == "function" then
+                            local info = debug.getinfo(v)
+                            if info and info.source then
+                                local jobMatch = string.match(info.source, "%x%x%x%x%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%x%x%x%x%x%x%x%x")
+                                if jobMatch and jobMatch ~= game.JobId then
+                                    return jobMatch
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+            
+            return nil
+        end)
+        
+        if success and result then
+            print("[BYPASS] Low-level access found:", result)
+            return result
+        end
+        return nil
+    end
+    
+    local methods = {
+        {"Memory Scan", scanGameMemory},
+        {"Lua State", inspectLuaState},
+        {"Network Bypass", networkBypass},
+        {"Debug Info", extractFromDebugInfo},
+        {"Metatable Bypass", metatableBypass},
+        {"Property Enumeration", propertyEnumeration},
+        {"Low-Level Access", lowLevelAccess}
+    }
+    
+    for _, method in ipairs(methods) do
+        local name, func = method[1], method[2]
+        print("[BYPASS] Trying method:", name)
+        
+        local realJobId = func()
+        if realJobId and realJobId ~= game.JobId then
+            print("[SUCCESS] Found real JobId using", name .. ":", realJobId)
+            print("[COMPARISON] Spoofed JobId:", game.JobId)
+            print("[COMPARISON] Real JobId:", realJobId)
+            return realJobId
+        end
+    end
+    
+    print("[BYPASS] All methods failed. The spoofing might be at a deeper level.")
+    return nil
+end
+
+local function diagnoseJobIdSpoofing()
+    print("\n[DIAGNOSTIC] Analyzing JobId spoofing implementation...")
+    print("[INFO] Current JobId:", game.JobId)
+    print("[INFO] JobId length:", #game.JobId)
+    print("[INFO] JobId pattern match:", string.match(game.JobId, "%x%x%x%x%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%x%x%x%x%x%x%x%x") and "Valid UUID" or "Invalid/Spoofed")
+    
+    local jobId1 = game.JobId
+    wait(0.1)
+    local jobId2 = game.JobId
+    print("[INFO] JobId consistency:", jobId1 == jobId2 and "Consistent" or "Changes on access")
+    
+    local mt = getmetatable(game)
+    print("[INFO] Game metatable exists:", mt ~= nil)
+    if mt and mt.__index then
+        print("[INFO] __index is function:", type(mt.__index) == "function")
+    end
+    
+    local originalToString = tostring
+    local gameString = originalToString(game)
+    print("[INFO] Game instance string:", gameString)
+    
+    local genv = getgenv and getgenv() or _G
+    local deltaSignatures = {
+        "delta", "Delta", "DELTA", 
+        "spoof", "Spoof", "SPOOF",
+        "hook", "Hook", "HOOK"
+    }
+    
+    for _, sig in ipairs(deltaSignatures) do
+        if genv[sig] or rawget(_G, sig) then
+            print("[DETECTED] Found Delta signature:", sig)
+        end
+    end
+    
+    print("[DIAGNOSTIC] Analysis complete.\n")
+end
+
+local function main()
+    print("=== DELTA JOBID BYPASS SCRIPT ===")
+    print("Target: Get original JobId bypassing Delta's spoofing")
+    print("Environment: Delta Executor (Mobile)")
+    print("=====================================\n")
+    
+    diagnoseJobIdSpoofing()
+    
+    local originalJobId = attemptBypass()
+    
+    if originalJobId then
+        print("\n[FINAL RESULT] SUCCESS!")
+        print("Original JobId:", originalJobId)
+        print("Spoofed JobId:", game.JobId)
+        
+        getgenv().REAL_JOBID = originalJobId
+        getgenv().SPOOFED_JOBID = game.JobId
+        
+        print("\n[ACCESS] You can now access:")
+        print("- Real JobId: getgenv().REAL_JOBID")
+        print("- Spoofed JobId: getgenv().SPOOFED_JOBID")
+        
+    else
+        print("\n[FINAL RESULT] BYPASS FAILED")
+        print("The JobId spoofing is implemented at a level that requires different approach.")
+        print("This could be:")
+        print("1. Native library level (libroblox.so) modification")
+        print("2. JNI interface hooking")
+        print("3. Kernel-level spoofing")
+        
+        print("\n[RECOMMENDATION] Try these additional approaches:")
+        print("1. Use Frida to hook the native library directly")
+        print("2. Modify the libroblox.so before loading")
+        print("3. Use memory patching tools")
+    end
+end
+
+main()
+
+getgenv().compareJobIds = function()
+    local current = game.JobId
+    local real = getgenv().REAL_JOBID
+    
+    print("Current JobId:", current)
+    print("Real JobId:", real or "Not found")
+    print("Are they different?", real and (current ~= real) or "Unknown")
+end
+
+getgenv().monitorJobId = function()
+    spawn(function()
+        while true do
+            local current = game.JobId
+            print("[MONITOR]", os.date(), "JobId:", current)
+            wait(5)
+        end
+    end)
+end
+
+print("\n[READY] Script loaded. Additional functions available:")
+print("- getgenv().compareJobIds() - Compare current vs real JobId")
+print("- getgenv().monitorJobId() - Monitor JobId changes")
